@@ -397,6 +397,7 @@ protected:
 
 	void *cls;
 	void *clientstate;
+	void *clientstate_sven;
 	void *sv;
 	ptrdiff_t offTime;
 	ptrdiff_t offWorldmodel;

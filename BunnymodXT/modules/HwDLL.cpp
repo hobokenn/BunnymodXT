@@ -379,6 +379,7 @@ void HwDLL::Clear()
 	insideHost_Reload_f = false;
 	cls = nullptr;
 	clientstate = nullptr;
+	clientstate_sven = nullptr;
 	sv = nullptr;
 	offTime = 0;
 	offWorldmodel = 0;
@@ -782,6 +783,9 @@ void HwDLL::FindStuff()
 				case 3: // HL-SteamPipe-8308
 					cmd_text = reinterpret_cast<cmdbuf_t*>(*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Cbuf_Execute) + 3));
 					break;
+				case 4: // Sven-8832
+					cmd_text = reinterpret_cast<cmdbuf_t*>(*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Cbuf_Execute) + 1));
+					break;
 				}
 			});
 
@@ -797,6 +801,9 @@ void HwDLL::FindStuff()
 				case 1: // HL-NGHL
 					cvar_vars = reinterpret_cast<cvar_t**>(*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Cvar_RegisterVariable) + 122));
 					break;
+				case 2: // Sven-8832
+					cvar_vars = reinterpret_cast<cvar_t**>(*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Cvar_RegisterVariable) + 23));
+					break;
 				}
 			});
 
@@ -804,10 +811,15 @@ void HwDLL::FindStuff()
 			ORIG_SeedRandomNumberGenerator,
 			patterns::engine::SeedRandomNumberGenerator,
 			[&](auto pattern) {
-				ORIG_time = reinterpret_cast<_time>(
-					*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_SeedRandomNumberGenerator) + 3)
-					+ reinterpret_cast<uintptr_t>(ORIG_SeedRandomNumberGenerator) + 7
-				);
+				switch (pattern - patterns::engine::SeedRandomNumberGenerator.cbegin())
+				{
+				case 0: // HL-SteamPipe
+				case 1:
+					ORIG_time = reinterpret_cast<_time>(
+						*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_SeedRandomNumberGenerator) + 3)
+						+ reinterpret_cast<uintptr_t>(ORIG_SeedRandomNumberGenerator) + 7);
+						break;
+				}
 			});
 
 		auto fCL_Stop_f = FindAsync(
@@ -821,9 +833,11 @@ void HwDLL::FindStuff()
 				case 0: // SteamPipe
 					offset = 25;
 					break;
-
 				case 1: // NGHL
 					offset = 22;
+					break;
+				case 2: // Sven-8832
+					offset = 35;
 					break;
 				}
 
@@ -835,7 +849,16 @@ void HwDLL::FindStuff()
 			SCR_DrawFPS,
 			patterns::engine::SCR_DrawFPS,
 			[&](auto pattern) {
-				host_frametime = *reinterpret_cast<double**>(reinterpret_cast<uintptr_t>(SCR_DrawFPS) + 21);
+				switch (pattern - patterns::engine::SCR_DrawFPS.cbegin())
+				{
+				default:
+				case 0: // SteamPipe
+					host_frametime = *reinterpret_cast<double**>(reinterpret_cast<uintptr_t>(SCR_DrawFPS) + 21);
+					break;
+				case 1: // Sven-8832
+					host_frametime = *reinterpret_cast<double**>(reinterpret_cast<uintptr_t>(SCR_DrawFPS) + 39);
+					break;
+				}
 			});
 
 		void *CL_Move;
@@ -843,7 +866,16 @@ void HwDLL::FindStuff()
 			CL_Move,
 			patterns::engine::CL_Move,
 			[&](auto pattern) {
-				frametime_remainder = *reinterpret_cast<double**>(reinterpret_cast<uintptr_t>(CL_Move) + 451);
+				switch (pattern - patterns::engine::CL_Move.cbegin())
+				{
+				default:
+				case 0: // SteamPipe
+					frametime_remainder = *reinterpret_cast<double**>(reinterpret_cast<uintptr_t>(CL_Move) + 451);
+					break;
+				case 1: // Sven-8832
+					frametime_remainder = *reinterpret_cast<double**>(reinterpret_cast<uintptr_t>(CL_Move) + 581);
+					break;
+				}
 			});
 
 		void *Host_Tell_f;
@@ -874,6 +906,12 @@ void HwDLL::FindStuff()
 					offCmd_Argc = 25;
 					offCmd_Args = 78;
 					offCmd_Argv = 151;
+					break;
+				case 4: // Sven-8832
+					offCmd_Argc = 44;
+					offCmd_Args = 59;
+					offCmd_Argv = 163;
+					break;
 				}
 
 				auto f = reinterpret_cast<uintptr_t>(Host_Tell_f);
@@ -897,20 +935,41 @@ void HwDLL::FindStuff()
 			patterns::engine::Host_AutoSave_f,
 			[&](auto pattern) {
 				auto f = reinterpret_cast<uintptr_t>(Host_AutoSave_f);
-				sv = *reinterpret_cast<void**>(f + 19);
-				offTime = 0x10;
-				offWorldmodel = 304;
-				offModels = 0x30950;
-				offNumEdicts = 0x3bc58;
-				offEdicts = 0x3bc60;
-				ORIG_Con_Printf = reinterpret_cast<_Con_Printf>(
-					*reinterpret_cast<ptrdiff_t*>(f + 33)
-					+ (f + 37)
-					);
-				cls = *reinterpret_cast<void**>(f + 69);
-				svs = reinterpret_cast<svs_t*>(*reinterpret_cast<uintptr_t*>(f + 45) - 8);
-				offEdict = *reinterpret_cast<ptrdiff_t*>(f + 122);
-				clientstate = reinterpret_cast<void*>(*reinterpret_cast<uintptr_t*>(f + 86) - 0x2AF80);
+				switch (pattern - patterns::engine::Host_AutoSave_f.cbegin())
+				{
+				case 0: // SteamPipe
+					sv = *reinterpret_cast<void**>(f + 19);
+					offTime = 0x10;
+					offWorldmodel = 304;
+					offModels = 0x30950;
+					offNumEdicts = 0x3bc58;
+					offEdicts = 0x3bc60;
+					ORIG_Con_Printf = reinterpret_cast<_Con_Printf>(
+						*reinterpret_cast<ptrdiff_t*>(f + 33)
+						+ (f + 37)
+						);
+					cls = *reinterpret_cast<void**>(f + 69);
+					svs = reinterpret_cast<svs_t*>(*reinterpret_cast<uintptr_t*>(f + 45) - 8);
+					offEdict = *reinterpret_cast<ptrdiff_t*>(f + 122);
+					clientstate = reinterpret_cast<void*>(*reinterpret_cast<uintptr_t*>(f + 86) - 0x2AF80);
+					break;
+				case 1: // Sven-8832
+					sv = *reinterpret_cast<void**>(f + 15);
+					offTime = 0x10;
+					offWorldmodel = 304;
+					offModels = 0x276150;
+					offNumEdicts = 0x4A1558;
+					offEdicts = 0x4A1560;
+					ORIG_Con_Printf = reinterpret_cast<_Con_Printf>(
+						*reinterpret_cast<ptrdiff_t*>(f + 28)
+						+ (f + 32)
+						);
+					cls = *reinterpret_cast<void**>(f + 65);
+					svs = reinterpret_cast<svs_t*>(*reinterpret_cast<uintptr_t*>(f + 40) - 8);
+					offEdict = *reinterpret_cast<ptrdiff_t*>(f + 118);
+					clientstate_sven = reinterpret_cast<void*>(*reinterpret_cast<uintptr_t*>(f + 83) - 0x242780);
+					break;
+				}
 			});
 
 		void *MiddleOfSV_ReadClientMessage;
@@ -945,6 +1004,12 @@ void HwDLL::FindStuff()
 					ppmove = *reinterpret_cast<void***>(reinterpret_cast<uintptr_t>(MiddleOfSV_ReadClientMessage) + 39);
 					sv_player = *reinterpret_cast<edict_t***>(reinterpret_cast<uintptr_t>(MiddleOfSV_ReadClientMessage) + 23);
 					break;
+				case 4: // Sven-8832.
+					host_client = *reinterpret_cast<client_t***>(reinterpret_cast<uintptr_t>(MiddleOfSV_ReadClientMessage) + 8);
+					svmove = *reinterpret_cast<void**>(reinterpret_cast<uintptr_t>(MiddleOfSV_ReadClientMessage) + 48);
+					ppmove = *reinterpret_cast<void***>(reinterpret_cast<uintptr_t>(MiddleOfSV_ReadClientMessage) + 44);
+					sv_player = *reinterpret_cast<edict_t***>(reinterpret_cast<uintptr_t>(MiddleOfSV_ReadClientMessage) + 20);
+					break;
 				}
 			});
 
@@ -953,10 +1018,22 @@ void HwDLL::FindStuff()
 			MiddleOfSV_RunCmd,
 			patterns::engine::MiddleOfSV_RunCmd,
 			[&](auto pattern) {
-				sv_areanodes = *reinterpret_cast<char**>(reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 20);
-				ORIG_SV_AddLinksToPM = reinterpret_cast<_SV_AddLinksToPM>(
-					*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 25)
-					+ reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 29);
+				switch (pattern - patterns::engine::MiddleOfSV_RunCmd.cbegin())
+				{
+				default:
+				case 0: // SteamPipe
+					sv_areanodes = *reinterpret_cast<char**>(reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 20);
+					ORIG_SV_AddLinksToPM = reinterpret_cast<_SV_AddLinksToPM>(
+						*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 25)
+						+ reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 29);
+					break;
+				case 1: // Sven-8832
+					sv_areanodes = *reinterpret_cast<char**>(reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 22);
+					ORIG_SV_AddLinksToPM = reinterpret_cast<_SV_AddLinksToPM>(
+						*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 27)
+						+ reinterpret_cast<uintptr_t>(MiddleOfSV_RunCmd) + 31);
+					break;
+				}
 			});
 
 		auto fHost_Changelevel2_f = FindAsync(
@@ -989,6 +1066,11 @@ void HwDLL::FindStuff()
 					ORIG_SV_SpawnServer = reinterpret_cast<_SV_SpawnServer>(
 						*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Host_Changelevel2_f) + 248)
 						+ reinterpret_cast<uintptr_t>(ORIG_Host_Changelevel2_f) + 252);
+					break;
+				case 5: // Sven-8832
+					ORIG_SV_SpawnServer = reinterpret_cast<_SV_SpawnServer>(
+						*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Host_Changelevel2_f) + 328)
+						+ reinterpret_cast<uintptr_t>(ORIG_Host_Changelevel2_f) + 332);
 					break;
 				}
 			});
@@ -1023,6 +1105,11 @@ void HwDLL::FindStuff()
 					ORIG_Cbuf_InsertTextLines = reinterpret_cast<_Cbuf_InsertTextLines>(
 						*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Cmd_Exec_f) + 769)
 						+ reinterpret_cast<uintptr_t>(ORIG_Cmd_Exec_f) + 773);
+					break;
+				case 5: // Sven-8832
+					ORIG_Cbuf_InsertTextLines = reinterpret_cast<_Cbuf_InsertTextLines>(
+						*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(ORIG_Cmd_Exec_f) + 631)
+						+ reinterpret_cast<uintptr_t>(ORIG_Cmd_Exec_f) + 635);
 					break;
 				}
 			});
@@ -1068,6 +1155,10 @@ void HwDLL::FindStuff()
 						+ reinterpret_cast<uintptr_t>(Cmd_ExecuteString) + 20);
 					cmd_alias = *reinterpret_cast<cmdalias_t**>(reinterpret_cast<uintptr_t>(Cmd_ExecuteString) + 72);
 					break;
+				case 3: // Sven-8832
+					ORIG_Cmd_TokenizeString = reinterpret_cast<_Cmd_TokenizeString>(reinterpret_cast<uintptr_t>(Cmd_ExecuteString) - 0xE0);
+					cmd_alias = *reinterpret_cast<cmdalias_t**>(reinterpret_cast<uintptr_t>(Cmd_ExecuteString) + 641);
+					break;
 				}
 			});
 
@@ -1096,7 +1187,12 @@ void HwDLL::FindStuff()
 			if (Host_AutoSave_f) {
 				EngineDevMsg("[hw dll] Found Host_AutoSave_f at %p (using the %s pattern).\n", Host_AutoSave_f, pattern->name());
 				EngineDevMsg("[hw dll] Found cls at %p.\n", cls);
-				EngineDevMsg("[hw dll] Found clientstate at %p.\n", clientstate);
+				if (clientstate) {
+					EngineDevMsg("[hw dll] Found clientstate at %p.\n", clientstate);
+				}
+				else if (clientstate_sven) {
+					EngineDevMsg("[hw dll] Found clientstate at %p.\n", clientstate_sven);
+				}
 				EngineDevMsg("[hw dll] Found sv at %p.\n", sv);
 				EngineDevMsg("[hw dll] Found svs at %p.\n", svs);
 				EngineDevMsg("[hw dll] Found Con_Printf at %p.\n", ORIG_Con_Printf);
@@ -3930,7 +4026,12 @@ bool HwDLL::TryGettingAccurateInfo(float origin[3], float velocity[3], float& he
 void HwDLL::GetViewangles(float* va)
 {
 	if (clientstate) {
-		float *viewangles = reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(clientstate) + 0x2ABE4);
+		float* viewangles = reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(clientstate) + 0x2ABE4);
+		va[0] = viewangles[0];
+		va[1] = viewangles[1];
+		va[2] = viewangles[2];
+	} else if (clientstate_sven) {
+		float* viewangles = reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(clientstate_sven) + 0x2423E4);
 		va[0] = viewangles[0];
 		va[1] = viewangles[1];
 		va[2] = viewangles[2];

@@ -378,6 +378,7 @@ void ServerDLL::FindStuff()
 	auto fCBasePlayer__TakeDamage = FindAsync(ORIG_CBasePlayer__TakeDamage, patterns::server::CBasePlayer__TakeDamage);
 	auto fCBasePlayer__CheatImpulseCommands = FindAsync(ORIG_CBasePlayer__CheatImpulseCommands, patterns::server::CBasePlayer__CheatImpulseCommands);
 	auto fCTriggerSave__SaveTouch = FindAsync(ORIG_CTriggerSave__SaveTouch, patterns::server::CTriggerSave__SaveTouch);
+	auto fCNihilanth__DyingThink = FindAsync(ORIG_CNihilanth__DyingThink, patterns::server::CNihilanth__DyingThink);
 
 	auto fCGraph__InitGraph = FindAsync(
 		ORIG_CGraph__InitGraph,
@@ -663,16 +664,21 @@ void ServerDLL::FindStuff()
 		}
 	}
 
-	ORIG_CNihilanth__DyingThink = reinterpret_cast<_CNihilanth__DyingThink>(MemUtils::GetSymbolAddress(m_Handle, "?DyingThink@CNihilanth@@QAEXXZ"));
+	auto pattern = fCNihilanth__DyingThink.get();
 	if (ORIG_CNihilanth__DyingThink) {
-		EngineDevMsg("[server dll] Found CNihilanth::DyingThink at %p.\n", ORIG_CNihilanth__DyingThink);
+		EngineDevMsg("[server dll] Found CNihilanth::DyingThink at %p (using the %s pattern).\n", ORIG_CNihilanth__DyingThink, pattern->name());
 	} else {
-		ORIG_CNihilanth__DyingThink_Linux = reinterpret_cast<_CNihilanth__DyingThink_Linux>(MemUtils::GetSymbolAddress(m_Handle, "_ZN10CNihilanth10DyingThinkEv"));
-		if (ORIG_CNihilanth__DyingThink_Linux)
-			EngineDevMsg("[server dll] Found CNihilanth::DyingThink [Linux] at %p.\n", ORIG_CNihilanth__DyingThink_Linux);
-		else {
-			EngineDevWarning("[server dll] Could not find CNihilanth::DyingThink.\n");
-			EngineWarning("Nihilanth automatic timer stopping is not available.\n");
+		ORIG_CNihilanth__DyingThink = reinterpret_cast<_CNihilanth__DyingThink>(MemUtils::GetSymbolAddress(m_Handle, "?DyingThink@CNihilanth@@QAEXXZ"));
+		if (ORIG_CNihilanth__DyingThink) {
+			EngineDevMsg("[server dll] Found CNihilanth::DyingThink at %p.\n", ORIG_CNihilanth__DyingThink);
+		} else {
+			ORIG_CNihilanth__DyingThink_Linux = reinterpret_cast<_CNihilanth__DyingThink_Linux>(MemUtils::GetSymbolAddress(m_Handle, "_ZN10CNihilanth10DyingThinkEv"));
+			if (ORIG_CNihilanth__DyingThink_Linux)
+				EngineDevMsg("[server dll] Found CNihilanth::DyingThink [Linux] at %p.\n", ORIG_CNihilanth__DyingThink_Linux);
+			else {
+				EngineDevWarning("[server dll] Could not find CNihilanth::DyingThink.\n");
+				EngineWarning("Nihilanth automatic timer stopping is not available.\n");
+			}
 		}
 	}
 
@@ -836,8 +842,8 @@ void ServerDLL::FindStuff()
 				if (addr) {
 					blolly = true;
 				} else {
-					// Sven Co-op version: has a push in between.
-					static constexpr auto p = PATTERN("BF ?? ?? ?? ?? F3 A5 68 ?? ?? ?? ?? A3");
+					// Sven Co-op 8832
+					static constexpr auto p = PATTERN("BF ?? ?? ?? ?? F3 A5 A3 ?? ?? ?? ?? E8");
 					addr = MemUtils::find_pattern(pGiveFnptrsToDll, 40, p);
 					if (addr) {
 						svencoop = true;
@@ -867,7 +873,7 @@ void ServerDLL::FindStuff()
 				else if (svencoop)
 				{
 					pEngfuncs = *reinterpret_cast<enginefuncs_t**>(addr + 1);
-					ppGlobals = *reinterpret_cast<globalvars_t***>(addr + 13);
+					ppGlobals = *reinterpret_cast<globalvars_t***>(addr + 8);
 				}
 				else if (twhltower)
 				{
